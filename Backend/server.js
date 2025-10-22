@@ -22,15 +22,25 @@ const mongoOptions = {
   useUnifiedTopology: true,
   dbName: process.env.DB_NAME || 'CodeEditorIDE',
   retryWrites: true,
-  w: 'majority'
+  w: 'majority',
+  connectTimeoutMS: 30000,
+  socketTimeoutMS: 45000,
+  serverSelectionTimeoutMS: 60000
 };
 
-mongoose.connect(process.env.MONGO_URL, mongoOptions)
-  .then(() => console.log('MongoDB Atlas Connected'))
-  .catch(err => {
-    console.error('MongoDB Connection Error:', err.message);
-    process.exit(1);
-  });
+// Connection with retry logic
+const connectWithRetry = () => {
+  console.log('Attempting to connect to MongoDB...');
+  mongoose.connect(process.env.MONGO_URL, mongoOptions)
+    .then(() => console.log('MongoDB Atlas Connected'))
+    .catch(err => {
+      console.error('MongoDB Connection Error:', err.message);
+      console.log('Retrying connection in 5 seconds...');
+      setTimeout(connectWithRetry, 5000);
+    });
+};
+
+connectWithRetry();
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -45,9 +55,19 @@ app.use('/api/files', fileRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/s3', s3Routes);
 
-// Health check
+// Health check routes
 app.get('/api/', (req, res) => {
   res.json({ message: 'CipherStudio API is running!' });
+});
+
+app.get('/health', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  res.json({ 
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    dbStatus: dbStatus,
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
 
 // Error handling middleware
