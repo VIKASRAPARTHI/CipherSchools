@@ -16,13 +16,19 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGO_URL, {
-  dbName: process.env.DB_NAME
-})
-  .then(() => console.log('MongoDB Connected'))
+// MongoDB Connection with Atlas support
+const mongoOptions = {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  dbName: process.env.DB_NAME || 'CodeEditorIDE',
+  retryWrites: true,
+  w: 'majority'
+};
+
+mongoose.connect(process.env.MONGO_URL, mongoOptions)
+  .then(() => console.log('MongoDB Atlas Connected'))
   .catch(err => {
-    console.error('MongoDB Connection Error:', err);
+    console.error('MongoDB Connection Error:', err.message);
     process.exit(1);
   });
 
